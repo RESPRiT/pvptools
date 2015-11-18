@@ -1,0 +1,12 @@
+1	On the Nice List	Most Karma Earned	22
+2	Purity	Fewest Active Effects	22
+3	All Bundled Up	Most Cold Resistance	22
+4	Checking It Twice	Most Opponents Deated Twice	22
+5	Conservational Yule	Most Lumberjacks Defeated	22
+6	Creative Holiday Feasting	Most Unique Foods Eaten	22
+7	Early Shopper	Highest Initiative	22
+8	Holiday Spirit(s)!	Highest Booze Drop	22
+9	Into the Holiday Bunker	Most Basement Levels Cleared	22
+10	Peace on Earth	Highest Non-Combat	22
+11	Spirit of Gnoel	Most Gnomes Defeated	22
+12	Unbroken Holiday Spirit	Longest Random Attack Streak	22

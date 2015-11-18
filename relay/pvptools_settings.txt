@@ -1,0 +1,2 @@
+1	pvp_miniDesc	boolean	Replace PvP mini titles with descriptions	gen
+2	pvp_winColor	boolean	Color win text	gen

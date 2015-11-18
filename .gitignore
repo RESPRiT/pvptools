@@ -1,0 +1,19 @@
+#Ignore everything else
+*
+
+#Git files
+!.gitignore
+!.gitattributes
+!.git
+
+#Relevant files
+!scripts
+scripts/*
+!scripts/pvptools.ash
+
+!relay
+relay/*
+!relay/relay_pvptools.ash
+!relay/pvp_minis.txt
+!relay/pvptools_settings.txt
+!relay/peevpee.ash
