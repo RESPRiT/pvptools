@@ -5,7 +5,6 @@
 * TO-DO:
 * 	-Parse fight log
 *	-Display mini scores
-*	-Combat helper (count enemies defeated)
 *	-Cleaner Maximizer
 *
 * https://github.com/RESPRiT
@@ -13,6 +12,14 @@
 script "PvP Tools";
 #notify tamedtheturtle; Don't need this yet
 import "zlib.ash";
+
+//-------------------------------------------------------------------------------------------------
+// Global Variables
+record mini {
+	string title; // Name of the mini
+	string desc;  // Description to replace title
+	string season;
+};
 
 //---------------------------------------------------------
 // Configurable Variables
@@ -59,7 +66,9 @@ int maxBuffs(string toMax, int maxPrice, int PPF, int fites, int eatLimit, int d
 			float itemDuration = numeric_modifier(rec.item, "Effect Duration");
 			int itemAmount = ceil((fites - have_effect(rec.effect)) / itemDuration);
 			
-			if(PPF <= mall_price(rec.item) / itemDuration && 
+			print("PPF: " + PPF + ", mall_price:" + mall_price(rec.item)/itemDuration);
+			
+			if(PPF >= (mall_price(rec.item) / itemDuration) && 
 				my_meat() >= mall_price(rec.item) * itemAmount && 
 				totalPrice + mall_price(rec.item) * itemAmount < spendingLimit) {
 				
@@ -73,6 +82,10 @@ int maxBuffs(string toMax, int maxPrice, int PPF, int fites, int eatLimit, int d
 				use_skill(rec.skill);
 			}
 		}
+	}
+	
+	foreach buff in my_effects() {
+		
 	}
 	
 	return totalPrice;
@@ -101,12 +114,66 @@ float getMiniScore(string mini) {
 	return 0.0; // Placeholder
 }
 
+/**************************************************************************************************
+Description:
+	Iterates through the archive to obtain individual fight data. Data is exported to a text map.
+	
+Input:
+	None.
+	
+Output:
+	success		- Returns true if successful
+**************************************************************************************************/
+boolean parseFiteLogs() {
+	string archive = visit_url("peevpee.php?place=logs&mevs=0&oldseason=0&showmore=1");
+	matcher logmatcher = create_matcher("action=log&ff=1&lid=\\d*&place=logs&pwd=" + my_hash(), archive);
+	string [string][string][string][string][string][string][string][string][string][string][string][string][string][string] fitedata;
+
+	int i = 0;
+
+	while(find(logmatcher)) {
+		i += 1;
+		
+		if(i > 50) abort("Let's take a break.");
+		
+		print("-----" + i + "-----");
+		
+		string fitelog = visit_url("peevpee.php?" + group(logmatcher));
+		matcher minimatcher = create_matcher("(?<=nowrap><b>)[\\w|\\s]*(?=<\/b><\/td><td>)", fitelog);
+		matcher winnermatcher = create_matcher("(?<=<b>)[\\w|\\s]*(?=<\/b> )", fitelog);
+		matcher datematcher = create_matcher("(?<=Fight Replay: ).*(?= [\\d]*:[\\d]*[am|pm])", fitelog);
+		matcher timematcher = create_matcher("(?<=[\\d]* )[\\d]*:[\\d]*(am)?(pm)?(?=<\/b>)", fitelog);	
+		
+		find(datematcher); find(timematcher);
+		print("(" + group(datematcher) + " - " + group(timematcher) + ")");
+		
+		while(find(minimatcher)) {
+			if(!find(winnermatcher)) {
+				abort("NOPE");
+			}
+			print(group(minimatcher) + ": " + group(winnermatcher));
+		}
+
+		find(winnermatcher);
+		print("Overall Winner: " + group(winnermatcher));
+		
+		print("");
+	}
+
+	print("DONE!");
+	return false;
+}
+
 
 // Main
-//maxBuffs(maxList, maxPrice, PPF, pvp_attacks_left());
+if(my_name() == "bancer") {
+	print("BANCER!");
+	maxBuffs(maxList, 5000, 500, pvp_attacks_left());
+} else {
+	maxBuffs(maxList, maxPrice, PPF, pvp_attacks_left());
+}
 //cli_execute("outfit pvp");
 //maximize("cold res", false);
 
 // defence
-// maxBuffs(maxList, 10000, 1);
-
+// maxBuffs(maxList, 10000

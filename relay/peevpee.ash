@@ -50,9 +50,30 @@ buffer winColor(buffer page) {
 	return page;
 }
 
+buffer checkOnline(buffer page) {
+	//matcher usermatcher = create_matcher("(?<=who\=[\\d]*\">)[\\w|\\s]*(?=(&nbsp;)*?<\/a>)", page);
+	//matcher usermatcher = create_matcher("(?<=who\=.\">)[\\w|\\s]*(?=(&nbsp;)*<\/a>)", page);
+	matcher usermatcher = create_matcher("(?<=[\\d]*\">)[\\w|\\s]*(?=<\/a> has been)", page);
+	
+	int i = 0;
+	
+	while(i < 2) {	
+		find(usermatcher);
+		print(i + " : " + group(usermatcher));
+		
+		if(is_online(group(usermatcher))) {
+			page.replace_string(group(usermatcher), "<font color=\"green\">" + group(usermatcher) + "</font>");
+		}
+		i += 1;
+	}
+	
+	return page;
+}
+
 buffer enhance(buffer page) {
 	if(get_property("pvp_miniDesc").to_boolean()) page = miniDesc(page);
 	if(get_property("pvp_winColor").to_boolean()) page = winColor(page);
+	//page = checkOnline(page);
 	
 	return page;
 }

@@ -21,12 +21,6 @@ record setting {
 	string e;
 };
 
-record mini {
-	string title; // Name of the mini
-	string desc;  // Description to replace title
-	string season;
-};
-
 setting[int] s;
 string[string] fields;
 boolean success;
