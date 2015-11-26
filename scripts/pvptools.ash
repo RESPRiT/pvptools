@@ -1,11 +1,9 @@
 /*************************************************************************************************
 * PvP Tools by RESPRiT
-* Version 0.0
+* Version 0.1
 * 
 * TO-DO:
-* 	-Parse fight log
-*	-Display mini scores
-*	-Cleaner Maximizer
+* 	-Search "To-do" to see details in function headers
 *
 * https://github.com/RESPRiT
 **************************************************************************************************/
@@ -15,14 +13,61 @@ import "zlib.ash";
 
 //-------------------------------------------------------------------------------------------------
 // Global Variables
+
+// PvP Minigame
 record mini {
 	string title; // Name of the mini
 	string desc;  // Description to replace title
 	string season;
 };
 
+// General usage range (mainly for food/booze handling)
+record range
+{
+  float max;
+  float min;
+};
+
 //---------------------------------------------------------
-// Configurable Variables
+// Helper Functions
+
+/**************************************************************************************************
+Function: averange
+
+Description:
+	Gives the average value of a range (shamelessly stolen-ish from EatDrink.ash)
+
+Input:
+	rangestring - Range to evaluate
+	
+Output:
+	*			- Average value
+**************************************************************************************************/
+float averange(string rangestring)
+{
+  string[int] splitRange = split_string(rangestring, "-");
+  range returnval;
+  // If we only got 1 number, return it for both
+  if (count(splitRange) == 1)
+  {
+    returnval.max = to_float(splitRange[0]);
+    returnval.min = returnval.max;
+    return (returnval.max + returnval.min) / 2;
+  }
+  else if (splitRange[0]=="")
+  {
+    returnval.max = (-1.0) * to_float(splitRange[1]) ;
+    returnval.min = returnval.max;
+    return (returnval.max + returnval.min) / 2;
+  }
+  // Return the 2 numbers
+  returnval.min = to_float(splitRange[0]);
+  returnval.max = to_float(splitRange[1]);
+  return (returnval.max + returnval.min) / 2;
+}
+
+//---------------------------------------------------------
+// Mini Helping Functions
 
 // All are placeholders
 int maxPrice = 1000; // Hardcap item cost regardless of adventures given
@@ -32,6 +77,8 @@ string maxList = "cold res, init, booze drop, -combat"; // Modifiers to max
 int purityLimit = 999;
 
 /**************************************************************************************************
+Function: maxBuffs
+
 Description:
 	Uses the maximizer to maximize a given list of modifiers
 
@@ -101,6 +148,83 @@ int maxBuffs(string toMax, int maxPrice, int PPF, int fites) {
 }
 
 /**************************************************************************************************
+Function: uniquelyConsume
+
+To-do:
+	-Parse consumable history for list of consumed foods
+	-More flags (total to consume, etc)
+	-Buffbot needs better handling
+
+Description:
+	Consumes unique boozes or foods to help the player's unique consumable mini
+	
+Input:
+	type		- Consumable type
+	maxPrice	- Maximum item cost to consider
+	maxSize		- Maximum consumable space to fill (fullness, drunkness)
+	minAdv		- Minimum adventures per consumable space to consider (ie adv/full, adv/drunk)
+	advBuff		- Whether or not to acquire adventure boosting buff (Got Milk and Ode to Booze)
+	
+Output:
+	success		- Was consumption successful
+**************************************************************************************************/
+boolean uniquelyConsume(string type, int maxPrice, int maxSize, float minAdv, boolean advBuff) {
+	boolean[item] consumed;
+	boolean success = true;
+	
+	foreach yummy in $items[] {
+		if(my_fullness() >= fullness_limit()) {
+			print("Uh, we're done here.", "red");
+			return false;
+		}
+
+		if(advBuff) {
+			if(have_effect($effect[Got Milk]) == 0 && type == "food") {
+				cli_execute("use milk of mag");
+			} else if(have_effect($effect[Ode to Booze]) == 0){
+				if(have_skill($skill[Ode to Booze])) {
+					use_skill($skill[Ode to Booze]);
+				} else {
+					chat_private("buffy", "ode to booze");
+					wait(15);
+					if(have_effect($effect[Ode to Booze]) == 0) {
+						print("Nothing from Buffy yet, I'm going to wait a bit more.", "green");
+						wait(15);
+					}
+					if(have_effect($effect[Ode to Booze]) == 0) {
+						abort("No Ode! Nooooooo-de!");
+					}
+				}
+			}
+		}
+		
+		if(is_tradeable(yummy) && item_type(yummy) == type && yummy != $item[none] && 
+			mall_price(yummy) <= maxPrice && !consumed[yummy] && yummy.fullness <= maxSize && 
+			averange(yummy.adventures) / yummy.fullness >= minAdv) {
+			
+			print("Found! " + yummy.to_string(), "blue");
+			consumed[yummy] = true;
+			buy(1, yummy);
+			if(item_type(yummy) == "food") {
+				eat(1, yummy);
+			} else {
+				drink(1, yummy);
+			}
+		}
+	}
+	
+	return success;
+}
+
+//---------------------------------------------------------
+// Information Functions
+
+/**************************************************************************************************
+Function: getMiniScore
+
+To-do:
+	-Everything
+
 Description:
 	Returns the current score of a given PvP minigame
 	
@@ -115,6 +239,13 @@ float getMiniScore(string mini) {
 }
 
 /**************************************************************************************************
+Function: parseFiteLogs
+
+To-do:
+	-Store gathered info
+	-Fix ties
+	-Get defending vs attacking
+
 Description:
 	Iterates through the archive to obtain individual fight data. Data is exported to a text map.
 	
@@ -166,7 +297,7 @@ boolean parseFiteLogs() {
 
 
 // Main
-if(my_name() == "bancer") {
+if(my_name() == "null") {
 	print("BANCER!");
 	maxBuffs(maxList, 5000, 500, pvp_attacks_left());
 } else {
