@@ -66,22 +66,22 @@ Output:
 	Returns the average value
 **************************************************************************************************/
 float averange(string rangestring) {
-  string[int] splitRange = split_string(rangestring, "-");
-  range returnval;
-  // If we only got 1 number, return it for both
-  if(count(splitRange) == 1) {
-    returnval.max = to_float(splitRange[0]);
-    returnval.min = returnval.max;
-    return (returnval.max + returnval.min) / 2;
-  } else if (splitRange[0]=="") {
-    returnval.max = (-1.0) * to_float(splitRange[1]) ;
-    returnval.min = returnval.max;
-    return (returnval.max + returnval.min) / 2;
-  }
-  // Return the 2 numbers
-  returnval.min = to_float(splitRange[0]);
-  returnval.max = to_float(splitRange[1]);
-  return (returnval.max + returnval.min) / 2;
+	string[int] splitRange = split_string(rangestring, "-");
+	range returnval;
+	// If we only got 1 number, return it for both
+	if(count(splitRange) == 1) {
+		returnval.max = to_float(splitRange[0]);
+		returnval.min = returnval.max;
+		return (returnval.max + returnval.min) / 2;
+	} else if (splitRange[0]=="") {
+		returnval.max = (-1.0) * to_float(splitRange[1]) ;
+		returnval.min = returnval.max;
+		return (returnval.max + returnval.min) / 2;
+	}
+	// Return the 2 numbers
+	returnval.min = to_float(splitRange[0]);
+	returnval.max = to_float(splitRange[1]);
+	return (returnval.max + returnval.min) / 2;
 }
 
 //---------------------------------------------------------
@@ -123,44 +123,70 @@ Input:
 Output:
 	Returns true if successful
 **************************************************************************************************/
-boolean parseFiteLogs() {
+boolean parseFiteLogs(int count, boolean CLIprint) {
 	string archive = visit_url("peevpee.php?place=logs&mevs=0&oldseason=0&showmore=1");
 	matcher logmatcher = create_matcher("action=log&ff=1&lid=\\d*&place=logs&pwd=" + my_hash(), archive);
 	//string [string][string][string][string][string][string][string][string][string][string][string][string][string][string] fitedata; // NOPE
 
+	boolean[string] test;
+	boolean[string] test2;
+	
 	int i = 0;
 
+	print("Starting parsing", "blue");
 	while(find(logmatcher)) {
 		i += 1;
 		
-		if(i > 50) abort("Let's take a break.");
+		if(i > count) {
+			print("Let's take a break.");
+			break;
+		}
 		
-		print("-----" + i + "-----");
+		if(CLIprint) print("-----" + i + "-----");
 		
 		string fitelog = visit_url("peevpee.php?" + group(logmatcher));
-		matcher minimatcher = create_matcher("(?<=nowrap><b>)[\\w|\\s]*(?=<\/b><\/td><td>)", fitelog);
+		matcher minimatcher = create_matcher("(?<=nowrap><b>)[\\w|\\s|\"|&|;|#|'|\.|\(|\)|?|!|-]*(?=<\/b><\/td><td>)", fitelog);
 		matcher winnermatcher = create_matcher("(?<=<b>)[\\w|\\s]*(?=<\/b> )", fitelog);
 		matcher datematcher = create_matcher("(?<=Fight Replay: ).*(?= [\\d]*:[\\d]*[am|pm])", fitelog);
 		matcher timematcher = create_matcher("(?<=[\\d]* )[\\d]*:[\\d]*(am)?(pm)?(?=<\/b>)", fitelog);	
 		
 		find(datematcher); find(timematcher);
-		print("(" + group(datematcher) + " - " + group(timematcher) + ")");
+		if(CLIprint) print("(" + group(datematcher) + " - " + group(timematcher) + ")");
 		
 		while(find(minimatcher)) {
 			if(!find(winnermatcher)) {
 				abort("NOPE");
 			}
-			print(group(minimatcher) + ": " + group(winnermatcher));
+			if(CLIprint) print(group(minimatcher) + ": " + group(winnermatcher));
+			if(group(minimatcher) == "Spirit of Gnoel" && to_lower_case(group(winnermatcher)) != my_name() && !test[group(winnermatcher)]) {
+				test[group(winnermatcher)] = true;
+			}
 		}
 
 		find(winnermatcher);
-		print("Overall Winner: " + group(winnermatcher));
+		if(CLIprint) print("Overall Winner: " + group(winnermatcher));
 		
-		print("");
+		if(to_lower_case(group(winnermatcher)) != my_name()) {
+			test2[group(winnermatcher)] = true;
+		}
+		
+		if(CLIprint) print("");
 	}
 
+	foreach winner in test {
+		print(winner, "blue");
+	}
+	
+	foreach winner in test2 {
+		print(winner, "green");
+	}
+	
 	print("DONE!");
 	return false;
+}
+
+boolean parseFiteLogs(int count) {
+	return parseFiteLogs(count, false);
 }
 
 /**************************************************************************************************
@@ -231,13 +257,6 @@ boolean parseConsumptionLogs() {
 //---------------------------------------------------------
 // Mini Helping Functions
 
-// All are placeholders
-int maxPrice = 1000; // Hardcap item cost regardless of adventures given
-int PPF = 250; // Price Per Fite
-int spendingLimit = 250000;
-string maxList = "cold res, init, booze drop, -combat"; // Modifiers to max
-int purityLimit = 999;
-
 /**************************************************************************************************
 Function: maxBuffs
 
@@ -263,7 +282,7 @@ Output:
 	Returns the total meat spent maximizing
 **************************************************************************************************/
 int maxBuffs(string toMax, int maxPrice, int PPF, int fites, int eatLimit, int drinkLimit, 	
-			int spleenLimit, int purityLimit) {
+			int spleenLimit, int purityLimit, int spendingLimit, boolean daily) {
 
 	int totalPrice = 0;
 
@@ -298,23 +317,75 @@ int maxBuffs(string toMax, int maxPrice, int PPF, int fites, int eatLimit, int d
 					restore_mp(mp_cost(rec.skill));
 				}
 			}
+		} else if(rec.item == $item[d20]) {
+			print("Time for d20's wild ride!", "blue");
+			
+			while(have_effect($effect[Natural 20]) == 0) {
+				cli_execute("uneffect Natural 1");
+				buy(1, $item[d20]);
+				use(1, $item[d20]);
+				
+				if(have_effect($effect[Natural 1]) >= 1) {
+					print("Bad roll!", "red");
+					cli_execute("uneffect Natural 1");
+				} else if (have_effect($effect[Natural 20]) >= 1) {
+					print("Good roll!", "blue");
+					break;
+				}
+			}
 		}
 	}
 	
-	foreach buff in my_effects() {
-		
+	if(daily && pvp_attacks_left() < 100) {
+		if(my_fullness() + 4 < fullness_limit()) {
+			cli_execute("eat very hot lunch");
+		}
 	}
+	
+	if(daily && pvp_attacks_left() < 50) {
+		if(my_fullness() < fullness_limit()) {
+			cli_execute("eat meat stick");
+		}
+		
+		if(have_effect($effect[Silent Running]) == 0) cli_execute("swim sprints");
+	}
+	
+	if(daily && pvp_attacks_left() < 30) {
+		if(have_effect($effect[infernal thirst]) == 0) cli_execute("summon infernal thirst");
+		if(have_effect($effect[Hustlin']) == 0 ) {
+			cli_execute("pool 3");
+			cli_execute("pool 3");
+			cli_execute("pool 3");
+		}
+	}
+	
+	if(daily && pvp_attacks_left() < 20) {
+		if(have_effect($effect[Brother Smothers's Blessing]) == 0) cli_execute("friars booze");
+		if(have_effect($effect[White-boy Angst]) == 0) cli_execute("concert white");
+		if(have_effect($effect[Racing!]) == 0) cli_execute("play buff init");
+	}
+	
+	if(daily && pvp_attacks_left() < 5) {
+		if(have_effect($effect[Video... Games?]) == 0) cli_execute("use defective game grid token");
+	}
+	
+	// poison!!
+	cli_execute("uneffect a little bit poisoned");
+	cli_execute("uneffect hardly poisoned at all");
+	cli_execute("uneffect majorly poisoned");
+	cli_execute("uneffect really quite poisoned");
+	cli_execute("uneffect somewhat poisoned");
 	
 	return totalPrice;
 }
 
 //@Override
 int maxBuffs(string toMax) {
-	return maxBuffs(toMax, my_meat(), my_meat(), pvp_attacks_left(), 0, 0, 0, 999);
+	return maxBuffs(toMax, my_meat(), my_meat(), pvp_attacks_left(), 0, 0, 0, 999, 999999999, false);
 }
 
 int maxBuffs(string toMax, int maxPrice, int PPF, int fites) {
-	return maxBuffs(toMax, maxPrice, PPF, fites, 0, 0, 0, 999);
+	return maxBuffs(toMax, maxPrice, PPF, fites, 0, 0, 0, 999, 999999999, false);
 }
 
 /**************************************************************************************************
@@ -323,7 +394,6 @@ Function: uniquelyConsume
 To-do:
 	-More flags (total to consume, etc)
 	-Buffbot needs better handling
-	-Mayo to drunkness... er fullness to drunkness via mayo
 
 Description:
 	Consumes unique boozes or foods to help the player's unique consumable mini
@@ -338,7 +408,7 @@ Input:
 Output:
 	Returns true if successful
 **************************************************************************************************/
-boolean uniquelyConsume(string type, int maxPrice, int maxSize, float minAdv, boolean advBuff) {
+boolean uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, float minAdv, boolean advBuff, boolean useMayo) {
 	boolean[item] consumed;
 	int season = getSeasonNumber();
 	string yummyFile = "pvp_" + my_name() + "_yummyData_" + season + ".txt";
@@ -347,9 +417,15 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, float minAdv, bo
 	}
 	
 	foreach yummy in $items[] {
-		if(my_fullness() >= fullness_limit()) {
-			print("Uh, we're done here.", "red");
-			return false;
+		if(useMayo && (my_inebriety() >= maxFill || my_inebriety() >= inebriety_limit())) {
+			set_property("choiceAdventure1076", 6);
+			cli_execute("use mayo minder");
+			set_property("choiceAdventure1076", 0);
+			print("Uh, we're done here?", "red");
+			break;
+		} else if(!useMayo && my_fullness() >= maxFill) {
+			print("Uh, we're done here!", "red");
+			break;
 		}
 
 		if(advBuff) {
@@ -373,11 +449,24 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, float minAdv, bo
 		}
 		
 		if(is_tradeable(yummy) && item_type(yummy) == type && yummy != $item[none] && 
-			mall_price(yummy) <= maxPrice && !consumed[yummy] && yummy.fullness <= maxSize && 
-			averange(yummy.adventures) / yummy.fullness >= minAdv) {
+			mall_price(yummy) <= maxPrice && mall_price(yummy) != -1 && !consumed[yummy] && 
+			yummy.fullness <= maxSize && averange(yummy.adventures) / yummy.fullness >= minAdv) {
 			
 			print("Found! " + yummy.to_string(), "blue");
 			buy(1, yummy);
+			
+			if(useMayo) {
+				if(item_amount($item[mayodiol]) == 0) {
+					buy(1, $item[mayodiol]);
+				}
+				set_property("choiceAdventure1076", 2);
+				cli_execute("use mayo minder");
+				set_property("choiceAdventure1076", 0);
+			} else {
+				set_property("choiceAdventure1076", 6);
+				cli_execute("use mayo minder");
+				set_property("choiceAdventure1076", 0);
+			}
 			
 			boolean success;
 			if(item_type(yummy) == "food") {
@@ -392,6 +481,8 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, float minAdv, bo
 		}
 	}
 	
+	print("Finished!", "blue");
+	
 	if(!map_to_file(consumed, yummyFile)) {
 		return false;
 	}
@@ -399,11 +490,27 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, float minAdv, bo
 	return true;
 }
 
-// Main
-boolean main() {
-	parseConsumptionLogs();
-	uniquelyConsume("food", 5000, 1, 3, true);
-	//maxBuffs(maxList, maxPrice, PPF, pvp_attacks_left());
+//maxBuffs(string toMax, int maxPrice, int PPF, int fites, int eatLimit, int drinkLimit, 	
+//			int spleenLimit, int purityLimit, int spendingLimit)
 
+//uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, float minAdv, boolean advBuff, boolean useMayo)
+
+// Main
+boolean main(string doWhat) {
+	switch(doWhat) {
+		case 'unique':
+			parseConsumptionLogs();
+			uniquelyConsume("food", 5000, 2, 9, 3, true, true);
+			break;
+		case 'logs':
+			parseFiteLogs(100, true);
+			break;
+		case 'buff':
+			maxBuffs("cold res, init, booze drop, -combat", 5000, 250, pvp_attacks_left(), 0, 0, 0, 999, 999999999, true);
+			break;
+		case 'capbuff':
+			maxBuffs("cold res, init, booze drop, -combat", 5000, 250, 1, 0, 0, 0, 999, 999999999, false);
+			break;
+	}
 	return true;
 }
