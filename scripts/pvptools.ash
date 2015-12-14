@@ -18,7 +18,7 @@ import "zlib.ash";
 record mini {
 	string title; // Name of the mini
 	string desc;  // Description to replace title
-	string season;
+	boolean state; // State-based or not
 };
 
 // General usage range (mainly for food/booze handling)
@@ -26,6 +26,16 @@ record range
 {
   float max;
   float min;
+};
+
+// PvP Fite
+record fite {
+	string opponent;
+	boolean offense;
+	string date;
+	string time;
+	boolean[string] mini;
+	boolean win;
 };
 
 //---------------------------------------------------------
@@ -51,7 +61,32 @@ int getSeasonNumber() {
 	return group(seasonMatcher,1).to_int();
 }
 
+/**************************************************************************************************
+Function: getLatestFite
 
+Description:
+	Returns the latest fite number in the fite data
+
+Input:
+	None.
+	
+Output:
+	Returns the latest fite number in the fite data
+**************************************************************************************************/
+int getLatestFite() {
+	int latest = 0;
+	fite[int] fiteData;
+	
+	file_to_map("pvp_" + my_name() + "_fiteData_" + getSeasonNumber() + ".txt", fiteData);
+	
+	foreach num in fiteData {
+		if(num > latest) {
+			latest = num;
+		}
+	}
+	
+	return latest;
+}
 
 /**************************************************************************************************
 Function: averange
@@ -123,18 +158,25 @@ Input:
 Output:
 	Returns true if successful
 **************************************************************************************************/
-boolean parseFiteLogs(int count, boolean CLIprint) {
+boolean parseFiteLogs(int count, boolean CLIprint, boolean override) {
 	string archive = visit_url("peevpee.php?place=logs&mevs=0&oldseason=0&showmore=1");
-	matcher logmatcher = create_matcher("action=log&ff=1&lid=\\d*&place=logs&pwd=" + my_hash(), archive);
-	//string [string][string][string][string][string][string][string][string][string][string][string][string][string][string] fitedata; // NOPE
-
+	matcher logmatcher = create_matcher("action=log&ff=1&lid=(\\d*)&place=logs&pwd=" + my_hash(), 
+		archive);
+	fite[int] fiteData;
+	file_to_map("pvp_" + my_name() + "_fiteData_" + getSeasonNumber() + ".txt", fiteData);
+	
+	//peevpee.php?action=log&ff=1&lid=855860&place=logs&pwd=91c8994ea59ea1fa4be18aa948a03a50
+	//peevpee.php?action=log&ff=1&lid=0&place=logs&pwd=91c8994ea59ea1fa4be18aa948a03a50
+	
 	boolean[string] test;
 	boolean[string] test2;
 	
 	int i = 0;
-
+	//int latest = getLatestFite();
+	
 	print("Starting parsing", "blue");
 	while(find(logmatcher)) {
+		int fitenum = to_int(group(logmatcher, 1));
 		i += 1;
 		
 		if(i > count) {
@@ -142,51 +184,71 @@ boolean parseFiteLogs(int count, boolean CLIprint) {
 			break;
 		}
 		
-		if(CLIprint) print("-----" + i + "-----");
-		
-		string fitelog = visit_url("peevpee.php?" + group(logmatcher));
-		matcher minimatcher = create_matcher("(?<=nowrap><b>)[\\w|\\s|\"|&|;|#|'|\.|\(|\)|?|!|-]*(?=<\/b><\/td><td>)", fitelog);
-		matcher winnermatcher = create_matcher("(?<=<b>)[\\w|\\s]*(?=<\/b> )", fitelog);
-		matcher datematcher = create_matcher("(?<=Fight Replay: ).*(?= [\\d]*:[\\d]*[am|pm])", fitelog);
-		matcher timematcher = create_matcher("(?<=[\\d]* )[\\d]*:[\\d]*(am)?(pm)?(?=<\/b>)", fitelog);	
-		
-		find(datematcher); find(timematcher);
-		if(CLIprint) print("(" + group(datematcher) + " - " + group(timematcher) + ")");
-		
-		while(find(minimatcher)) {
-			if(!find(winnermatcher)) {
-				abort("NOPE");
+		if(fiteData[fitenum].date == "" || override) {
+			if(CLIprint) print("-----" + i + " : " + fitenum + "-----");
+			
+			string fitelog = visit_url("peevpee.php?action=log&ff=1&lid=" + fitenum + 
+				"&place=logs&pwd=" + my_hash());
+			matcher playermatcher = create_matcher("who=[\\d]*\">([\\w|\\s]*)<\/a>", fitelog);
+			matcher minimatcher = create_matcher("nowrap><b>([\\w|\\s|\"|&|;|#|'|\.|\(|\)|?|!|-]*)<\/b><\/td><td>", fitelog);
+			matcher winnermatcher = create_matcher("<b>([\\w|\\s]*)<\/b> ", fitelog);
+			matcher datematcher = create_matcher("Fight Replay: (.*) [\\d]*:[\\d]*[a|p]", fitelog);
+			matcher timematcher = create_matcher("[\\d]* ([\\d]*:[\\d]*(am)?(pm)?)<\/b>", fitelog);	
+			
+			find(playermatcher);
+			
+			if(to_lower_case(group(playermatcher, 1)) == my_name()) {
+				fiteData[fitenum].offense = true;
+				find(playermatcher);
+				fiteData[fitenum].opponent = group(playermatcher, 1);
+			} else {
+				fiteData[fitenum].offense = false;
+				fiteData[fitenum].opponent = group(playermatcher, 1);
 			}
-			if(CLIprint) print(group(minimatcher) + ": " + group(winnermatcher));
-			if(group(minimatcher) == "Spirit of Gnoel" && to_lower_case(group(winnermatcher)) != my_name() && !test[group(winnermatcher)]) {
-				test[group(winnermatcher)] = true;
+			
+			find(datematcher); find(timematcher);
+			print("peevpee.php?action=log&ff=1&lid=" + fitenum + "&place=logs&pwd=" + my_hash());
+			if(CLIprint) print("(" + group(datematcher, 1) + " - " + group(timematcher, 1) + ")");
+			fiteData[fitenum].date = group(datematcher, 1);
+			fiteData[fitenum].time = group(timematcher, 1);
+			
+			while(find(minimatcher)) {
+				if(!find(winnermatcher)) {
+					abort("NOPE");
+				}
+				if(CLIprint) print(group(minimatcher, 1) + ": " + group(winnermatcher, 1));
+				if(to_lower_case(group(winnermatcher, 1)) == my_name()) {
+					fiteData[fitenum].mini[group(minimatcher, 1)] = true;
+				} else {
+					fiteData[fitenum].mini[group(minimatcher, 1)] = false;
+				}
+				if(group(minimatcher, 1) == "Spirit of Gnoel" && to_lower_case(group(winnermatcher, 1)) != my_name() && !test[group(winnermatcher, 1)]) {
+					test[group(winnermatcher, 1)] = true;
+				}
 			}
-		}
 
-		find(winnermatcher);
-		if(CLIprint) print("Overall Winner: " + group(winnermatcher));
-		
-		if(to_lower_case(group(winnermatcher)) != my_name()) {
-			test2[group(winnermatcher)] = true;
+			find(winnermatcher);
+			if(CLIprint) print("Overall Winner: " + group(winnermatcher, 1));
+			
+			if(to_lower_case(group(winnermatcher, 1)) == my_name()) {
+				fiteData[fitenum].win = true;
+			} else {
+				fiteData[fitenum].win = false;
+				test2[group(winnermatcher, 1)] = true;
+			}
+			
+			if(CLIprint) print("");
 		}
-		
-		if(CLIprint) print("");
-	}
-
-	foreach winner in test {
-		print(winner, "blue");
 	}
 	
-	foreach winner in test2 {
-		print(winner, "green");
-	}
+	map_to_file(fiteData, "pvp_" + my_name() + "_fiteData_" + getSeasonNumber() + ".txt");
 	
 	print("DONE!");
 	return false;
 }
 
 boolean parseFiteLogs(int count) {
-	return parseFiteLogs(count, false);
+	return parseFiteLogs(count, false, false);
 }
 
 /**************************************************************************************************
@@ -261,7 +323,6 @@ boolean parseConsumptionLogs() {
 Function: maxBuffs
 
 To-do:
-	-Better mp regen
 	-Buffbot Support?
 	-Weighting?
 
@@ -336,18 +397,9 @@ int maxBuffs(string toMax, int maxPrice, int PPF, int fites, int eatLimit, int d
 		}
 	}
 	
-	if(daily && pvp_attacks_left() < 100) {
-		if(my_fullness() + 4 < fullness_limit()) {
-			cli_execute("eat very hot lunch");
-		}
-	}
-	
 	if(daily && pvp_attacks_left() < 50) {
-		if(my_fullness() < fullness_limit()) {
-			cli_execute("eat meat stick");
-		}
-		
 		if(have_effect($effect[Silent Running]) == 0) cli_execute("swim sprints");
+		if(have_effect($effect[Cold Sweat]) == 0) cli_execute("mom cold");
 	}
 	
 	if(daily && pvp_attacks_left() < 30) {
@@ -496,14 +548,17 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, flo
 //uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, float minAdv, boolean advBuff, boolean useMayo)
 
 // Main
-boolean main(string doWhat) {
+boolean main(string params) {
+	string[int] args = split_string(params, " ");
+	string doWhat = args[0];
+	
 	switch(doWhat) {
 		case 'unique':
 			parseConsumptionLogs();
-			uniquelyConsume("food", 5000, 2, 9, 3, true, true);
+			uniquelyConsume("food", 5000, 2, 20, 3, true, false);
 			break;
 		case 'logs':
-			parseFiteLogs(100, true);
+			parseFiteLogs(to_int(args[1]), true, false);
 			break;
 		case 'buff':
 			maxBuffs("cold res, init, booze drop, -combat", 5000, 250, pvp_attacks_left(), 0, 0, 0, 999, 999999999, true);
