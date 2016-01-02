@@ -51,18 +51,18 @@ buffer winColor(buffer page) {
 }
 
 buffer checkOnline(buffer page) {
-	//matcher usermatcher = create_matcher("(?<=who\=[\\d]*\">)[\\w|\\s]*(?=(&nbsp;)*?<\/a>)", page);
-	//matcher usermatcher = create_matcher("(?<=who\=.\">)[\\w|\\s]*(?=(&nbsp;)*<\/a>)", page);
-	matcher usermatcher = create_matcher("(?<=[\\d]*\">)[\\w|\\s]*(?=<\/a> has been)", page);
+	//matcher usermatcher = create_matcher("(?<=[\\d]*\">)[\\w|\\s]*(?=<\/a> has been)", page);
+	//&nbsp;
+	matcher usermatcher = create_matcher("who=[\\d]*\">([\\w|\\s]*)&nbsp;&nbsp;&nbsp;<\/a>", page);
+	//matcher usermatcher = create_matcher("(?<=Top&nbsp;Normal&nbsp;Hill).*who=[\\d]*\">([\\w|\\s]*)&nbsp;&nbsp;&nbsp;<\/a>.*(?=Top&nbsp;Stainless&nbsp;Steel)", page);
 	
 	int i = 0;
 	
-	while(i < 2) {	
-		find(usermatcher);
-		print(i + " : " + group(usermatcher));
+	while(find(usermatcher)) {
+		print(i + " : " + group(usermatcher, 1));
 		
-		if(is_online(group(usermatcher))) {
-			page.replace_string(group(usermatcher), "<font color=\"green\">" + group(usermatcher) + "</font>");
+		if(is_online(group(usermatcher, 1))) {
+			page.replace_string(group(usermatcher, 1), "<font color=\"green\">" + group(usermatcher, 1) + "</font>");
 		}
 		i += 1;
 	}

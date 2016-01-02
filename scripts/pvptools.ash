@@ -36,6 +36,8 @@ record fite {
 	string time;
 	boolean[string] mini;
 	boolean win;
+	int fame;
+	int swagger;
 };
 
 //---------------------------------------------------------
@@ -59,6 +61,23 @@ int getSeasonNumber() {
 	
 	seasonMatcher.find();
 	return group(seasonMatcher,1).to_int();
+}
+
+/**************************************************************************************************
+Function: getSeasonStart
+
+Description:
+	Returns an array of the year/month/day of the season start
+
+Input:
+	None.
+	
+Output:
+	Returns the latest fite number in the fite data
+**************************************************************************************************/
+int[int] getSeasonStart() {
+	int[int] test;
+	return test; // placeholder
 }
 
 /**************************************************************************************************
@@ -87,6 +106,29 @@ int getLatestFite() {
 	
 	return latest;
 }
+
+/**************************************************************************************************
+Function: hasMayo
+
+Description:
+	Returns whether or not the player has the mayo clinic installed
+
+Input:
+	None.
+	
+Output:
+	Returns whether or not the player has the mayo clinic installed
+**************************************************************************************************/
+boolean hasMayo() {
+	string workshed = visit_url("campground.php?action=workshed");
+	
+	if(contains_text(to_lower_case(workshed), "mayo")) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
 
 /**************************************************************************************************
 Function: averange
@@ -194,6 +236,8 @@ boolean parseFiteLogs(int count, boolean CLIprint, boolean override) {
 			matcher winnermatcher = create_matcher("<b>([\\w|\\s]*)<\/b> ", fitelog);
 			matcher datematcher = create_matcher("Fight Replay: (.*) [\\d]*:[\\d]*[a|p]", fitelog);
 			matcher timematcher = create_matcher("[\\d]* ([\\d]*:[\\d]*(am)?(pm)?)<\/b>", fitelog);	
+			matcher famematcher = create_matcher("([\\w|\\s]*) (lost)?(gained)? fame:<\/td><td>([\\d]*)", fitelog);
+			matcher swaggermatcher = create_matcher("gained ([\\d]) swagger", fitelog);
 			
 			find(playermatcher);
 			
@@ -201,6 +245,9 @@ boolean parseFiteLogs(int count, boolean CLIprint, boolean override) {
 				fiteData[fitenum].offense = true;
 				find(playermatcher);
 				fiteData[fitenum].opponent = group(playermatcher, 1);
+				if(find(swaggermatcher)) {
+					fiteData[fitenum].swagger = to_int(group(swaggermatcher, 1));
+				}
 			} else {
 				fiteData[fitenum].offense = false;
 				fiteData[fitenum].opponent = group(playermatcher, 1);
@@ -222,9 +269,6 @@ boolean parseFiteLogs(int count, boolean CLIprint, boolean override) {
 				} else {
 					fiteData[fitenum].mini[group(minimatcher, 1)] = false;
 				}
-				if(group(minimatcher, 1) == "Spirit of Gnoel" && to_lower_case(group(winnermatcher, 1)) != my_name() && !test[group(winnermatcher, 1)]) {
-					test[group(winnermatcher, 1)] = true;
-				}
 			}
 
 			find(winnermatcher);
@@ -234,7 +278,15 @@ boolean parseFiteLogs(int count, boolean CLIprint, boolean override) {
 				fiteData[fitenum].win = true;
 			} else {
 				fiteData[fitenum].win = false;
-				test2[group(winnermatcher, 1)] = true;
+			}
+			
+			if(find(famematcher)) {
+				if(to_lower_case(group(famematcher, 1)) == my_name()) {
+					fiteData[fitenum].fame = to_int(group(famematcher, 4));
+				} else {
+					find(famematcher);
+					fiteData[fitenum].fame = -1 * to_int(group(famematcher, 4));
+				}
 			}
 			
 			if(CLIprint) print("");
@@ -378,7 +430,7 @@ int maxBuffs(string toMax, int maxPrice, int PPF, int fites, int eatLimit, int d
 					restore_mp(mp_cost(rec.skill));
 				}
 			}
-		} else if(rec.item == $item[d20]) {
+		} else if(rec.item == $item[d20] && mall_price($item[d20]) * 2 < PPF) {
 			print("Time for d20's wild ride!", "blue");
 			
 			while(have_effect($effect[Natural 20]) == 0) {
@@ -446,6 +498,9 @@ Function: uniquelyConsume
 To-do:
 	-More flags (total to consume, etc)
 	-Buffbot needs better handling
+	-Needs to purge AT buffs if at max
+	-Some checks are not very elegant
+	-How well is overeating/drinking handled? Not well I think
 
 Description:
 	Consumes unique boozes or foods to help the player's unique consumable mini
@@ -454,28 +509,37 @@ Input:
 	type		- Consumable type
 	maxPrice	- Maximum item cost to consider
 	maxSize		- Maximum consumable space to fill (fullness, drunkness)
-	minAdv		- Minimum adventures per consumable space to consider (ie adv/full, adv/drunk)
-	advBuff		- Whether or not to acquire adventure boosting buff (Got Milk and Ode to Booze)
+	minAdv		- Minimum adventures per consumable space to consider 
+				  (ie adv/full, adv/drunk)
+	advBuff		- Whether or not to acquire adventure boosting buff 
+				  (Got Milk and Ode to Booze)
+	useMayo		- Attempt to use the mayo clinic to convert some full to drunk
 	
 Output:
 	Returns true if successful
 **************************************************************************************************/
-boolean uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, float minAdv, boolean advBuff, boolean useMayo) {
+boolean uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, float minAdv, 
+		boolean advBuff, boolean useMayo) {
 	boolean[item] consumed;
+	boolean success;
 	int season = getSeasonNumber();
+	int fillSize;
 	string yummyFile = "pvp_" + my_name() + "_yummyData_" + season + ".txt";
+	
 	if(!file_to_map(yummyFile, consumed)) {
 		return false;
 	}
 	
 	foreach yummy in $items[] {
-		if(useMayo && (my_inebriety() >= maxFill || my_inebriety() >= inebriety_limit())) {
-			set_property("choiceAdventure1076", 6);
-			cli_execute("use mayo minder");
-			set_property("choiceAdventure1076", 0);
+		if(useMayo && hasMayo() && (my_inebriety() >= maxFill || my_inebriety() 
+				>= inebriety_limit())) {
+			set_property("choiceAdventure1076", 6); // set minder choice to nothing
+			cli_execute("use mayo minder");			// set minder 
+			set_property("choiceAdventure1076", 0); // set minder choice to default (prompt user)
 			print("Uh, we're done here?", "red");
 			break;
-		} else if(!useMayo && my_fullness() >= maxFill) {
+		} else if((type == "food" && my_fullness() >= maxFill) || 
+					(type == "booze" && my_inebriety() >= maxFill)) {
 			print("Uh, we're done here!", "red");
 			break;
 		}
@@ -500,9 +564,15 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, flo
 			}
 		}
 		
+		if(item_type(yummy) == "food") {
+			fillSize = yummy.fullness;
+		} else if(item_type(yummy) == "booze") {
+			fillSize = yummy.inebriety;
+		}
+		
 		if(is_tradeable(yummy) && item_type(yummy) == type && yummy != $item[none] && 
 			mall_price(yummy) <= maxPrice && mall_price(yummy) != -1 && !consumed[yummy] && 
-			yummy.fullness <= maxSize && averange(yummy.adventures) / yummy.fullness >= minAdv) {
+			fillSize <= maxSize && averange(yummy.adventures) / fillSize >= minAdv) {
 			
 			print("Found! " + yummy.to_string(), "blue");
 			buy(1, yummy);
@@ -511,19 +581,19 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, flo
 				if(item_amount($item[mayodiol]) == 0) {
 					buy(1, $item[mayodiol]);
 				}
-				set_property("choiceAdventure1076", 2);
-				cli_execute("use mayo minder");
-				set_property("choiceAdventure1076", 0);
-			} else {
+				set_property("choiceAdventure1076", 2); // set minder choice to drunk
+				cli_execute("use mayo minder");			// set minder to drunk
+				set_property("choiceAdventure1076", 0); // set minder choice to default
+			} else if (haveMayo()){
+				// I should be reverting to user's original settings, not nothing
 				set_property("choiceAdventure1076", 6);
 				cli_execute("use mayo minder");
 				set_property("choiceAdventure1076", 0);
 			}
 			
-			boolean success;
 			if(item_type(yummy) == "food") {
 				success = eat(1, yummy);
-			} else {
+			} else if(item_type(yummy) == "booze"){
 				success = drink(1, yummy);
 			}
 			
@@ -555,16 +625,16 @@ boolean main(string params) {
 	switch(doWhat) {
 		case 'unique':
 			parseConsumptionLogs();
-			uniquelyConsume("food", 5000, 2, 20, 3, true, false);
+			uniquelyConsume("booze", 5000, 1, 20, 3, true, false);
 			break;
 		case 'logs':
-			parseFiteLogs(to_int(args[1]), true, false);
+			parseFiteLogs(to_int(args[1]), false, true);
 			break;
 		case 'buff':
-			maxBuffs("cold res, init, booze drop, -combat", 5000, 250, pvp_attacks_left(), 0, 0, 0, 999, 999999999, true);
+			maxBuffs("cold res, init, booze drop, -combat", 1000, 50, pvp_attacks_left(), 0, 0, 0, 999, 999999999, false);
 			break;
 		case 'capbuff':
-			maxBuffs("cold res, init, booze drop, -combat", 5000, 250, 1, 0, 0, 0, 999, 999999999, false);
+			maxBuffs("cold res, init, booze drop, -combat", 1000, 50, 1, 0, 0, 0, 999, 999999999, false);
 			break;
 	}
 	return true;
