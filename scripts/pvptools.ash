@@ -1,6 +1,6 @@
 /*************************************************************************************************
 * PvP Tools by RESPRiT
-* Version 0.1
+* Version 0.2
 * 
 * TO-DO:
 * 	-Search "To-do" to see details in function headers
@@ -10,6 +10,7 @@
 script "PvP Tools";
 #notify tamedtheturtle; Don't need this yet
 import "zlib.ash";
+import "reslib.ash";
 
 //-------------------------------------------------------------------------------------------------
 // Global Variables
@@ -75,9 +76,14 @@ Input:
 Output:
 	Returns the latest fite number in the fite data
 **************************************************************************************************/
-int[int] getSeasonStart() {
-	int[int] test;
-	return test; // placeholder
+date getSeasonStart() {
+	date seasonStartDate;
+	
+	seasonStartDate.year = (getSeasonNumber() + 1) / 6 + 2012;
+	seasonStartDate.month = (getSeasonNumber() * 2 + 3) % 12;
+	seasonStartDate.day = 1;
+	
+	return seasonStartDate;
 }
 
 /**************************************************************************************************
@@ -319,45 +325,27 @@ Output:
 	Returns true if successful
 **************************************************************************************************/
 boolean parseConsumptionLogs() {
-	int season = getSeasonNumber();
-	int[int] seasonStartDate;
-	seasonStartDate[0] = (season + 1) / 6 + 2012;
-	seasonStartDate[1] = (season * 2 + 3) % 12;
-	seasonStartDate[2] = 1;
-
 	boolean[item] yummyData;
-	string yummyFile = "pvp_" + my_name() + "_yummyData_" + season + ".txt";
+	string yummyFile = "pvp_" + my_name() + "_yummyData_" + getSeasonNumber() + ".txt";
 	if(!file_to_map(yummyFile, yummyData)) {
 		return false;
 	}
 	
 	string yummylogs = visit_url("showconsumption.php?recent=1");
-	matcher consumablematcher = create_matcher(";'>([\\w|\\s|\"|&|;|#|'|\.|-]*)<\/a>&nbsp;&nbsp;", yummylogs);
+	matcher consumablematcher = create_matcher(";'>([\\w|\\s|\"|&|;|#|'|\.|-]*)<\/a>&nbsp;&nbsp;", 
+		yummylogs);
 	matcher datematcher = create_matcher("<small>([\\d|-]*) \\d+:\\d+[a|p]m<\/small>", yummylogs);
 	
 	while(find(consumablematcher) && find(datematcher)) {
 		print("FOUND: " + group(consumablematcher, 1) + ": " + group(datematcher, 1));
 	
 		string dateString = group(datematcher, 1);
-		string[int] splitDate = split_string(dateString, "-");
+		date yummyDate = stringToDate(dateString);
 		
 		item consumable = group(consumablematcher, 1).to_item();
 		
-		if(splitDate[0].to_int() > seasonStartDate[0]) { // hmm.......
-			print(" DING! " + splitDate[0] + " : " + seasonStartDate[0], "blue");
-			yummyData[consumable] = true;
-		} else if(splitDate[0].to_int() == seasonStartDate[0]) {
-			if(splitDate[1].to_int() > seasonStartDate[1]) {
-				print(" DING! " + splitDate[1] + " : " + seasonStartDate[1], "orange");
-				yummyData[consumable] = true;
-			} else if(splitDate[1].to_int() == seasonStartDate[1]) {
-				if(splitDate[2].to_int() >= seasonStartDate[2]) {
-					print(" DING! " + splitDate[2] + " : " + seasonStartDate[2], "green");
-					yummyData[consumable] = true;
-				} else {
-					print(" AWW! " + splitDate[2] + " : " + seasonStartDate[2], "red");
-				}
-			}
+		if(compareDate(yummyDate, getSeasonStart()) >= 0) {
+			print(" DING! " + dateString + " : " + dateToString(getSeasonStart()), "blue");
 		}
 	}
 	
@@ -485,7 +473,8 @@ int maxBuffs(string toMax, int maxPrice, int PPF, int fites, int eatLimit, int d
 
 //@Override
 int maxBuffs(string toMax) {
-	return maxBuffs(toMax, my_meat(), my_meat(), pvp_attacks_left(), 0, 0, 0, 999, 999999999, false);
+	return maxBuffs(toMax, my_meat(), my_meat(), pvp_attacks_left(), 0, 0, 0, 999, 999999999, 
+		false);
 }
 
 int maxBuffs(string toMax, int maxPrice, int PPF, int fites) {
@@ -584,7 +573,7 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, flo
 				set_property("choiceAdventure1076", 2); // set minder choice to drunk
 				cli_execute("use mayo minder");			// set minder to drunk
 				set_property("choiceAdventure1076", 0); // set minder choice to default
-			} else if (haveMayo()){
+			} else if (hasMayo()){
 				// I should be reverting to user's original settings, not nothing
 				set_property("choiceAdventure1076", 6);
 				cli_execute("use mayo minder");
@@ -618,9 +607,15 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, flo
 //uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, float minAdv, boolean advBuff, boolean useMayo)
 
 // Main
+// args can be better right? Surely
 boolean main(string params) {
 	string[int] args = split_string(params, " ");
 	string doWhat = args[0];
+	int arglen = 0;
+	
+	foreach arg in args {
+		arglen += 1;
+	}
 	
 	switch(doWhat) {
 		case 'unique':
@@ -628,13 +623,27 @@ boolean main(string params) {
 			uniquelyConsume("booze", 5000, 1, 20, 3, true, false);
 			break;
 		case 'logs':
-			parseFiteLogs(to_int(args[1]), false, true);
+			int fites;
+			
+			if(arglen == 1) {
+				fites = 1000;
+			} else {
+				fites = to_int(args[1]);
+			}
+			parseFiteLogs(fites, false, true);
+			break;
+		case 'eatlogs':
+			print("Yummy logs!", "green");
+			parseConsumptionLogs();
 			break;
 		case 'buff':
-			maxBuffs("cold res, init, booze drop, -combat", 1000, 50, pvp_attacks_left(), 0, 0, 0, 999, 999999999, false);
+			maxBuffs("item", 5000, 100, pvp_attacks_left(), 0, 0, 0, 999, 999999999, false);
 			break;
 		case 'capbuff':
-			maxBuffs("cold res, init, booze drop, -combat", 1000, 50, 1, 0, 0, 0, 999, 999999999, false);
+			maxBuffs("item", 5000, 100, 1, 0, 0, 0, 999, 999999999, false);
+			break;
+		default:
+			print("Give me an argument!", "blue");
 			break;
 	}
 	return true;

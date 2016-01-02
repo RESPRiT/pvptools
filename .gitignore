@@ -10,6 +10,7 @@
 !scripts
 scripts/*
 !scripts/pvptools.ash
+!scripts/reslib.ash
 
 !relay
 relay/*
