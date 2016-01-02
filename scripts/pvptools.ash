@@ -22,12 +22,7 @@ record mini {
 	boolean state; // State-based or not
 };
 
-// General usage range (mainly for food/booze handling)
-record range
-{
-  float max;
-  float min;
-};
+
 
 // PvP Fite
 record fite {
@@ -133,38 +128,6 @@ boolean hasMayo() {
 	} else {
 		return false;
 	}
-}
-
-
-/**************************************************************************************************
-Function: averange
-
-Description:
-	Gives the average value of a range (shamelessly stolen-ish from EatDrink.ash)
-
-Input:
-	rangestring - Range to evaluate
-	
-Output:
-	Returns the average value
-**************************************************************************************************/
-float averange(string rangestring) {
-	string[int] splitRange = split_string(rangestring, "-");
-	range returnval;
-	// If we only got 1 number, return it for both
-	if(count(splitRange) == 1) {
-		returnval.max = to_float(splitRange[0]);
-		returnval.min = returnval.max;
-		return (returnval.max + returnval.min) / 2;
-	} else if (splitRange[0]=="") {
-		returnval.max = (-1.0) * to_float(splitRange[1]) ;
-		returnval.min = returnval.max;
-		return (returnval.max + returnval.min) / 2;
-	}
-	// Return the 2 numbers
-	returnval.min = to_float(splitRange[0]);
-	returnval.max = to_float(splitRange[1]);
-	return (returnval.max + returnval.min) / 2;
 }
 
 //---------------------------------------------------------
