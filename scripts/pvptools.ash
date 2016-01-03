@@ -9,7 +9,6 @@
 **************************************************************************************************/
 script "PvP Tools";
 #notify tamedtheturtle; Don't need this yet
-import "zlib.ash";
 import "reslib.ash";
 
 //-------------------------------------------------------------------------------------------------
@@ -21,8 +20,6 @@ record mini {
 	string desc;  // Description to replace title
 	boolean state; // State-based or not
 };
-
-
 
 // PvP Fite
 record fite {
@@ -564,14 +561,69 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, flo
 	return true;
 }
 
+//---------------------------------------------------------
+// PvP Automation Functions
+
+//peevpee.php?action=fight&place=fight&pwd
+	//&ranked= (blank, 1, or 2)
+	//&stance=1 (0-11)
+	//&attacktype=lootwhatever (flowers, fame, lootwhatever)
+	//&who=redfoxtail (any user)
+	//&winmessage=test1
+	//&losemessage=test2
+boolean autoPvP(int fites, string type, string stance, string who, boolean tougher) {
+	int currentFites = pvp_attacks_left();
+	int callOut = 0;
+	int ranked = 1;
+	string typeStr;
+	string fiteBuffer;
+	
+	// ambiguous type handling
+	if(contains_text(type, "flowers")) {
+		typeStr = "flowers";
+		callOut += 1;
+	} 
+	if(contains_text(type, "loot")) {
+		typeStr = "lootwhatever";
+		callOut += 1;
+	} 
+	if(contains_text(type, "fame")) {
+		typeStr = "fame";
+		callOut += 1;
+	}
+	
+	if(tougher) ranked = 2;
+	
+	if(callOut > 1) {
+		print("I see what you did there... just so you know, I picked your attack type based on " +
+				"this precendence: Fame > Loot > Flowers", "green");
+	}
+	
+	if(who != "") {
+		fiteBuffer = visit_url("peevpee.php?action=fight&place=fight&pwd&ranked=" + 
+					"&stance=" + stance +
+					"&attacktype=" + typeStr +
+					"&who=" + who);
+	} else {
+		while(pvp_attacks_left() > currentFites - fites) {
+			fiteBuffer = visit_url("peevpee.php?action=fight&place=fight&pwd&ranked=" + ranked +
+						"&stance=" + stance +
+						"&attacktype=" + typeStr +
+						"&who=");
+		}
+	}
+	print("Done!", "blue");
+	return true;
+}
+
+//---------------------------------------------------------
+// Main Function
+//
 //maxBuffs(string toMax, int maxPrice, int PPF, int fites, int eatLimit, int drinkLimit, 	
 //			int spleenLimit, int purityLimit, int spendingLimit)
-
 //uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, float minAdv, boolean advBuff, boolean useMayo)
-
-// Main
 // args can be better right? Surely
-boolean main(string params) {
+void main(string params) {
 	string[int] args = split_string(params, " ");
 	string doWhat = args[0];
 	int arglen = 0;
@@ -580,34 +632,37 @@ boolean main(string params) {
 		arglen += 1;
 	}
 	
-	switch(doWhat) {
-		case 'unique':
-			parseConsumptionLogs();
-			uniquelyConsume("booze", 5000, 1, 20, 3, true, false);
-			break;
-		case 'logs':
-			int fites;
-			
-			if(arglen == 1) {
-				fites = 1000;
-			} else {
-				fites = to_int(args[1]);
-			}
-			parseFiteLogs(fites, false, true);
-			break;
-		case 'eatlogs':
-			print("Yummy logs!", "green");
-			parseConsumptionLogs();
-			break;
-		case 'buff':
-			maxBuffs("item", 5000, 100, pvp_attacks_left(), 0, 0, 0, 999, 999999999, false);
-			break;
-		case 'capbuff':
-			maxBuffs("item", 5000, 100, 1, 0, 0, 0, 999, 999999999, false);
-			break;
-		default:
-			print("Give me an argument!", "blue");
-			break;
+	if(to_int(doWhat) != 0) {
+		autoPvP(to_int(doWhat), "loot", "1", "", false);
+	} else {
+		switch(doWhat) {
+			case 'unique':
+				parseConsumptionLogs();
+				uniquelyConsume("booze", 5000, 1, 20, 3, true, false);
+				break;
+			case 'logs':
+				int fites;
+				
+				if(arglen == 1) {
+					fites = 1000;
+				} else {
+					fites = to_int(args[1]);
+				}
+				parseFiteLogs(fites, false, true);
+				break;
+			case 'eatlogs':
+				print("Yummy logs!", "green");
+				parseConsumptionLogs();
+				break;
+			case 'buff':
+				maxBuffs("item", 5000, 100, pvp_attacks_left(), 0, 0, 0, 999, 999999999, false);
+				break;
+			case 'capbuff':
+				maxBuffs("item", 5000, 100, 1, 0, 0, 0, 999, 999999999, false);
+				break;	
+			default:
+				print("Give me an argument!", "blue");
+				break;
+		}
 	}
-	return true;
 }
