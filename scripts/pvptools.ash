@@ -88,10 +88,10 @@ Input:
 	None.
 	
 Output:
-	Returns the latest fite number in the fite data
+	Returns the latest fite number in the fite data, returns -1 if unsuccessful
 **************************************************************************************************/
-int getLatestFite() {
-	int latest = 0;
+int getLatestSavedFite() {
+	int latest = -1;
 	fite[int] fiteData;
 	
 	file_to_map("pvp_" + my_name() + "_fiteData_" + getSeasonNumber() + ".txt", fiteData);
@@ -103,6 +103,30 @@ int getLatestFite() {
 	}
 	
 	return latest;
+}
+
+/**************************************************************************************************
+Function: getLatestFite
+
+Description:
+	Returns the latest fite number in the pvp archives
+
+Input:
+	None.
+	
+Output:
+	Returns the latest fite number in the pvp archives, returns -1 if unsuccessful
+**************************************************************************************************/
+int getLatestFite() {
+	string archive = visit_url("peevpee.php?place=logs&mevs=0&oldseason=0&showmore=1");
+	matcher logmatcher = create_matcher("action=log&ff=1&lid=(\\d*)&place=logs&pwd=" + my_hash(), 
+		archive);
+	
+	if(find(logmatcher)) {
+		return to_int(group(logmatcher, 1));
+	} else {
+		return -1;
+	}
 }
 
 /**************************************************************************************************
@@ -140,12 +164,20 @@ Description:
 	Returns the current score of a given PvP minigame
 	
 Input:
-	mini		- Name of the mini
+	mini	- Name of the mini
 	
 Output:
 	Returns the score of the given mini
 **************************************************************************************************/
 float getMiniScore(string mini) {
+	string booth = visit_url("peevpee.php?place=rules");
+	matcher miniinfomatcher = create_matcher("<td valign=\"top\" nowrap><b>" + 
+								"([\\w|\\s|\|&|;|#|'|\.|-|\(|\)]*)" + "<\/td><td valign=\"top\">" +
+								"([\\w|\\s|\|&|;|#|'|\.|-|\(|\)]*)" + "<\/td><td valign=\"top\"" +
+								"align=\"center\" colspan=\"1\">" + "([\\d]*)" + 
+								"<\/td><td valign=\"top\"" + "align=\"center\">" + "([\\d]*)", 
+								booth);
+	
 	return 0.0; // Placeholder
 }
 
@@ -564,19 +596,38 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, flo
 //---------------------------------------------------------
 // PvP Automation Functions
 
-//peevpee.php?action=fight&place=fight&pwd
-	//&ranked= (blank, 1, or 2)
-	//&stance=1 (0-11)
-	//&attacktype=lootwhatever (flowers, fame, lootwhatever)
-	//&who=redfoxtail (any user)
+/**************************************************************************************************
+Function: autoPvP
+
+To-do:
+	-Record fite data
+	-Implement win/lose message handling
+
+Description:
+	Automates a pvp attack given a set of parameters
+	
+Input:
+	fites	- Number of fites to execute
+	type	- Type of attack
+	stance	- Stance to attack with (0-11, usually)
+	who		- Player to attack specifically (or attack a tougher opponent with "tough")
+	
+Output:
+	Returns true if successful
+**************************************************************************************************/
+boolean autoPvP(int fites, string type, string stance, string who) {
 	//&winmessage=test1
 	//&losemessage=test2
-boolean autoPvP(int fites, string type, string stance, string who, boolean tougher) {
 	int currentFites = pvp_attacks_left();
 	int callOut = 0;
 	int ranked = 1;
-	string typeStr;
+	string typeStr = "null";
 	string fiteBuffer;
+	
+	if(pvp_attacks_left() == 0) {
+		print("You don't have any fights left!", "red");
+		return false;
+	}
 	
 	// ambiguous type handling
 	if(contains_text(type, "flowers")) {
@@ -591,15 +642,24 @@ boolean autoPvP(int fites, string type, string stance, string who, boolean tough
 		typeStr = "fame";
 		callOut += 1;
 	}
+	if(typeStr == "null") {
+		print("That isn't a valid attack type.", "red");
+		return false;
+	}
 	
-	if(tougher) ranked = 2;
 	
 	if(callOut > 1) {
 		print("I see what you did there... just so you know, I picked your attack type based on " +
 				"this precendence: Fame > Loot > Flowers", "green");
 	}
 	
+	if(who == "tough") ranked = 2;
+	
 	if(who != "") {
+		if(typeStr == "fame") {
+			print("You can't attack a specific player for fame.", "red");
+			return false;
+		}
 		fiteBuffer = visit_url("peevpee.php?action=fight&place=fight&pwd&ranked=" + 
 					"&stance=" + stance +
 					"&attacktype=" + typeStr +
@@ -632,8 +692,16 @@ void main(string params) {
 		arglen += 1;
 	}
 	
-	if(to_int(doWhat) != 0) {
-		autoPvP(to_int(doWhat), "loot", "1", "", false);
+	print(arglen);
+	
+	if(to_int(doWhat) > 0 && arglen >= 3) {
+		string who = "";
+	
+		if(arglen > 3) {
+			who = args[3];
+		}
+		//autoPvP(int fites, string type, string stance, string who)
+		autoPvP(to_int(doWhat), args[1], args[2], args[3]);
 	} else {
 		switch(doWhat) {
 			case 'unique':
@@ -661,7 +729,7 @@ void main(string params) {
 				maxBuffs("item", 5000, 100, 1, 0, 0, 0, 999, 999999999, false);
 				break;	
 			default:
-				print("Give me an argument!", "blue");
+				print("Invalid command!", "blue");
 				break;
 		}
 	}
