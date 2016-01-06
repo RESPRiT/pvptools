@@ -1,2 +1,26 @@
 1	pvp_miniDesc	boolean	Replace PvP mini titles with descriptions	gen
 2	pvp_winColor	boolean	Color win text	gen
+3	pvp_mini_0_state	boolean	Test
+4	pvp_mini_1_state	boolean	Test
+5	pvp_mini_2_state	boolean	Test
+6	pvp_mini_3_state	boolean	Test
+7	pvp_mini_4_state	boolean	Test
+8	pvp_mini_5_state	boolean	Test
+9	pvp_mini_6_state	boolean	Test
+10	pvp_mini_7_state	boolean	Test
+11	pvp_mini_8_state	boolean	Test
+12	pvp_mini_9_state	boolean	Test
+13	pvp_mini_10_state	boolean	Test
+14	pvp_mini_11_state	boolean	Test
+15	pvp_mini_0_greater	boolean	Test
+16	pvp_mini_1_greater	boolean	Test
+17	pvp_mini_2_greater	boolean	Test
+18	pvp_mini_3_greater	boolean	Test
+19	pvp_mini_4_greater	boolean	Test
+20	pvp_mini_5_greater	boolean	Test
+21	pvp_mini_6_greater	boolean	Test
+22	pvp_mini_7_greater	boolean	Test
+23	pvp_mini_8_greater	boolean	Test
+24	pvp_mini_9_greater	boolean	Test
+25	pvp_mini_10_greater	boolean	Test
+26	pvp_mini_11_greater	boolean	Test

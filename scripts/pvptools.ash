@@ -15,10 +15,11 @@ import "reslib.ash";
 // Global Variables
 
 // PvP Minigame
-record mini {
+record miniInfo {
 	string title; // Name of the mini
 	string desc;  // Description to replace title
 	boolean state; // State-based or not
+	boolean greater; // Greater score wins or not
 };
 
 // PvP Fite
@@ -27,7 +28,7 @@ record fite {
 	boolean offense;
 	string date;
 	string time;
-	boolean[string] mini;
+	boolean[string] minis;
 	boolean win;
 	int fame;
 	int swagger;
@@ -155,30 +156,86 @@ boolean hasMayo() {
 // Information Functions
 
 /**************************************************************************************************
-Function: getMiniScore
-
-To-do:
-	-Everything
+Function: getMiniInfo
 
 Description:
-	Returns the current score of a given PvP minigame
+	Returns the mini info of a given PvP minigame
 	
 Input:
 	mini	- Name of the mini
 	
 Output:
-	Returns the score of the given mini
+	Returns the mini info of the given mini
 **************************************************************************************************/
-float getMiniScore(string mini) {
+boolean getMiniInfo() {
 	string booth = visit_url("peevpee.php?place=rules");
-	matcher miniinfomatcher = create_matcher("<td valign=\"top\" nowrap><b>" + 
-								"([\\w|\\s|\|&|;|#|'|\.|-|\(|\)]*)" + "<\/td><td valign=\"top\">" +
-								"([\\w|\\s|\|&|;|#|'|\.|-|\(|\)]*)" + "<\/td><td valign=\"top\"" +
-								"align=\"center\" colspan=\"1\">" + "([\\d]*)" + 
-								"<\/td><td valign=\"top\"" + "align=\"center\">" + "([\\d]*)", 
-								booth);
+	int i = 0; // counter
+	miniInfo[int] miniData;
 	
-	return 0.0; // Placeholder
+	// There really isn't a great way to make regex readable
+	matcher infomatcher = create_matcher("<td valign=\"top\" nowrap><b>" + 
+								"([\\w|\\s|\|&|;|#|'|\.|\,|\(|\)|!|?|\*|\/|\-]*)" + 
+								"<\/b><\/td><td valign=\"top\">" +
+								"([\\w|\\s|\|&|;|#|'|\.|\,|\(|\)|!|?|\*|\/|\-]*)" + 
+								"<\/td><td valign=\"top\" align=\"center\" colspan=\"1\">" + 
+								"([\\d]*)" + 
+								"<\/td><td valign=\"top\" align=\"center\">" + "([\\d]*)" +
+								"<\/td>",
+								booth);
+	while(find(infomatcher)) {
+		miniData[i].title = group(infomatcher, 1);
+		miniData[i].desc = group(infomatcher, 2);
+		miniData[i].state = to_boolean(get_property("pvp_mini_" + i + "_state"));
+		miniData[i].greater = to_boolean(get_property("pvp_mini_" + i + "_greater"));
+		# returnMini.score = to_float(group(infomatcher, 3));
+		# returnMini.HCscore = to_float(group(infomatcher, 4));
+		i += 1;
+	}
+	
+	map_to_file(miniData, "pvp_miniData_" + getSeasonNumber() + ".txt");
+	
+	return true;
+}
+
+float getMiniScore(int id, boolean HC) {	
+	string booth = visit_url("peevpee.php?place=rules");
+	int i = 0; // counter
+	miniInfo[int] miniData;
+	
+	file_to_map("pvp_miniData_" + getSeasonNumber() + ".txt", miniData);
+	
+	// There really isn't a great way to make regex readable
+	matcher infomatcher = create_matcher("<td valign=\"top\" nowrap><b>" + 
+								"([\\w|\\s|\|&|;|#|'|\.|\,|\(|\)|!|?|\*|\/|\-]*)" + 
+								"<\/b><\/td><td valign=\"top\">" +
+								"([\\w|\\s|\|&|;|#|'|\.|\,|\(|\)|!|?|\*|\/|\-]*)" + 
+								"<\/td><td valign=\"top\" align=\"center\" colspan=\"1\">" + 
+								"([\\d]*)" + 
+								"<\/td><td valign=\"top\" align=\"center\">" + "([\\d]*)" +
+								"<\/td>",
+								booth);
+	while(find(infomatcher)) {
+		if(id == i) {
+			if(HC) {
+				return to_float(group(infomatcher, 4));
+			} else if(miniData[i].greater) {
+				if(to_float(group(infomatcher, 3)) > to_float(group(infomatcher, 4))) {
+					return to_float(group(infomatcher, 3));
+				} else {
+					return to_float(group(infomatcher, 4));
+				}
+			} else {
+				if(to_float(group(infomatcher, 3)) < to_float(group(infomatcher, 4))) {
+					return to_float(group(infomatcher, 3));
+				} else {
+					return to_float(group(infomatcher, 4));
+				}
+			}
+		}
+		i += 1;
+	}
+	
+	return -999;
 }
 
 /**************************************************************************************************
@@ -263,9 +320,9 @@ boolean parseFiteLogs(int count, boolean CLIprint, boolean override) {
 				}
 				if(CLIprint) print(group(minimatcher, 1) + ": " + group(winnermatcher, 1));
 				if(to_lower_case(group(winnermatcher, 1)) == my_name()) {
-					fiteData[fitenum].mini[group(minimatcher, 1)] = true;
+					fiteData[fitenum].minis[group(minimatcher, 1)] = true;
 				} else {
-					fiteData[fitenum].mini[group(minimatcher, 1)] = false;
+					fiteData[fitenum].minis[group(minimatcher, 1)] = false;
 				}
 			}
 

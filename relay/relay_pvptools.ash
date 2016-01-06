@@ -7,7 +7,6 @@
 * https://github.com/RESPRiT
 **************************************************************************************************/
 script "PvP Tools Relay";
-import "pvptools.ash";
 
 //-------------------------------------------------------------------------------------------------
 // Global Variables
@@ -25,8 +24,6 @@ setting[int] s;
 string[string] fields;
 boolean success;
 
-mini[int] miniList;
-
 string general;
 string experimental;
 string development;
@@ -34,14 +31,6 @@ string development;
 //-------------------------------------------------------------------------------------------------
 // Helper Functions
 boolean load_current_settings_map(string fname, setting[int] map) {
-	file_to_map(fname+".txt", map);
-	
-	if (count(map) == 0) return false;
-	
-	return true;
-}
-
-boolean load_current_mini_map(string fname, mini[int] map) {
 	file_to_map(fname+".txt", map);
 	
 	if (count(map) == 0) return false;
@@ -71,21 +60,6 @@ string generate_html(setting s) {
 	}
 	
 	return html;
-}
-
-// Temporary Test Code
-boolean generate_mini_scores() {
-	string html;
-	
-	boolean success = load_current_mini_map("pvp_minis", miniList);
-	
-	foreach i, mini in miniList {
-		writeln("<strong>" + mini.title + "</strong>" + ": " + getMiniScore(mini.title) + "<br>");
-	}
-	
-	writeln("&mdash;");
-	
-	return success;
 }
 
 //-------------------------------------------------------------------------------------------------
@@ -135,11 +109,7 @@ void main() {
 		writeln(development);
 	}
 	
-	generate_mini_scores(); // Temporary test code
-	
 	writeln("<tr><td colspan='3'><input type='submit' name='' value='Save Changes' /></td></tr></form>");
-	
-	
 	
 	writeln("</body></html>");
 }
