@@ -22,19 +22,13 @@ record miniInfo {
 	boolean greater; // Greater score wins or not
 };
 
-// Fite Mini Results
-record miniResults {
-	boolean win;
-	float score;
-};
-
 // PvP Fite
 record fite {
 	string opponent;
 	boolean offense;
 	string date;
 	string time;
-	miniResults[string] minis;
+	boolean[string] minis;
 	boolean win;
 	int fame;
 	int swagger;
@@ -184,8 +178,8 @@ boolean getMiniInfo() {
 								"<\/b><\/td><td valign=\"top\">" +
 								"([\\w|\\s|\|&|;|#|'|\.|\,|\(|\)|!|?|\*|\/|\-]*)" + 
 								"<\/td><td valign=\"top\" align=\"center\" colspan=\"1\">" + 
-								"([\\d|\,]*)" + 
-								"<\/td><td valign=\"top\" align=\"center\">" + "([\\d|\,]*)" +
+								"([\\d]*)" + 
+								"<\/td><td valign=\"top\" align=\"center\">" + "([\\d]*)" +
 								"<\/td>",
 								booth);
 	while(find(infomatcher)) {
@@ -216,8 +210,8 @@ float getMiniScore(int id, boolean HC) {
 								"<\/b><\/td><td valign=\"top\">" +
 								"([\\w|\\s|\|&|;|#|'|\.|\,|\(|\)|!|?|\*|\/|\-]*)" + 
 								"<\/td><td valign=\"top\" align=\"center\" colspan=\"1\">" + 
-								"([\\d|\,]*)" + 
-								"<\/td><td valign=\"top\" align=\"center\">" + "([\\d|\,]*)" +
+								"([\\d]*)" + 
+								"<\/td><td valign=\"top\" align=\"center\">" + "([\\d]*)" +
 								"<\/td>",
 								booth);
 	while(find(infomatcher)) {
@@ -242,20 +236,6 @@ float getMiniScore(int id, boolean HC) {
 	}
 	
 	return -999;
-}
-
-int miniToInt(string name) {
-	miniInfo[int] miniData;
-	
-	file_to_map("pvp_miniData_" + getSeasonNumber() + ".txt", miniData);
-	
-	foreach i, mini in miniData {
-		if(contains_text(to_lower_case(mini.title), to_lower_case(name))) {
-			return i;
-		}
-	}
-	
-	return -1;
 }
 
 /**************************************************************************************************
@@ -340,9 +320,9 @@ boolean parseFiteLogs(int count, boolean CLIprint, boolean override) {
 				}
 				if(CLIprint) print(group(minimatcher, 1) + ": " + group(winnermatcher, 1));
 				if(to_lower_case(group(winnermatcher, 1)) == my_name()) {
-					fiteData[fitenum].minis[group(minimatcher, 1)].win = true;
+					fiteData[fitenum].minis[group(minimatcher, 1)] = true;
 				} else {
-					fiteData[fitenum].minis[group(minimatcher, 1)].win = false;
+					fiteData[fitenum].minis[group(minimatcher, 1)] = false;
 				}
 			}
 
@@ -698,12 +678,8 @@ boolean autoPvP(int fites, string type, string stance, string who) {
 	int currentFites = pvp_attacks_left();
 	int callOut = 0;
 	int ranked = 1;
-	
 	string typeStr = "null";
 	string fiteBuffer;
-	
-	fite[int] fiteData;
-	file_to_map("pvp_" + my_name() + "_fiteData_" + getSeasonNumber() + ".txt", fiteData);
 	
 	if(pvp_attacks_left() == 0) {
 		print("You don't have any fights left!", "red");
@@ -728,14 +704,15 @@ boolean autoPvP(int fites, string type, string stance, string who) {
 		return false;
 	}
 	
+	
 	if(callOut > 1) {
 		print("I see what you did there... just so you know, I picked your attack type based on " +
-				"this precedence: Fame > Loot > Flowers", "green");
+				"this precendence: Fame > Loot > Flowers", "green");
 	}
 	
 	if(who == "tough") ranked = 2;
 	
-	if(who != "" && who != "tough") {
+	if(who != "") {
 		if(typeStr == "fame") {
 			print("You can't attack a specific player for fame.", "red");
 			return false;
@@ -744,49 +721,14 @@ boolean autoPvP(int fites, string type, string stance, string who) {
 					"&stance=" + stance +
 					"&attacktype=" + typeStr +
 					"&who=" + who);
-		
-		matcher minimatcher = create_matcher("nowrap><b>([\\w|\\s|\"|&|;|#|'|\.|\(|\)|?|!|-]*)<\/b><\/td><td>", fiteBuffer);
-		float[string] scores;
-		
-		while(find(minimatcher)) {
-			string miniName = group(minimatcher, 1);
-			scores[miniName]getMiniScore(miniToInt(miniName), in_hardcore());
-		}
-		
-		foreach mini, num in scores {
-			print("passing fite: " + getLatestFite());
-			print("passing mini: " + mini);
-			print("passing score: " + num);
-			fiteData[getLatestFite()].minis[mini].score = num;
-		}
-
 	} else {
 		while(pvp_attacks_left() > currentFites - fites) {
-			string url = "peevpee.php?action=fight&place=fight&pwd&ranked=" + ranked +
+			fiteBuffer = visit_url("peevpee.php?action=fight&place=fight&pwd&ranked=" + ranked +
 						"&stance=" + stance +
 						"&attacktype=" + typeStr +
-						"&who=";
-			fiteBuffer = visit_url(url);
-		
-			matcher minimatcher = create_matcher("nowrap><b>([\\w|\\s|\"|&|;|#|'|\.|\(|\)|?|!|-]*)<\/b><\/td><td>", fiteBuffer);
-			float[string] scores;
-			
-			while(find(minimatcher)) {
-				string miniName = group(minimatcher, 1);
-				scores[miniName] = getMiniScore(miniToInt(miniName), in_hardcore());
-			}
-			
-			foreach mini, num in scores {
-				print("passing fite: " + getLatestFite());
-				print("passing mini: " + mini);
-				print("passing score: " + num);
-				fiteData[getLatestFite()].minis[mini].score = num;
-			}
+						"&who=");
 		}
 	}
-	
-	map_to_file(fiteData, "pvp_" + my_name() + "_fiteData_" + getSeasonNumber() + ".txt");
-	
 	print("Done!", "blue");
 	return true;
 }
@@ -816,7 +758,7 @@ void main(string params) {
 			who = args[3];
 		}
 		//autoPvP(int fites, string type, string stance, string who)
-		autoPvP(to_int(doWhat), args[1], args[2], who);
+		autoPvP(to_int(doWhat), args[1], args[2], args[3]);
 	} else {
 		switch(doWhat) {
 			case 'unique':
