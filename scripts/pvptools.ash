@@ -28,6 +28,13 @@ record miniResults {
 	float score;
 };
 
+record lookupInfo {
+	boolean win;
+	boolean greater;
+	float score;
+	int latest;
+};
+
 // PvP Fite
 record fite {
 	string opponent;
@@ -203,11 +210,23 @@ boolean getMiniInfo() {
 	return true;
 }
 
+/**************************************************************************************************
+Function: getMiniScore
+
+Description:
+	Returns the score of a given mini
+	
+Input:
+	id	- The ID number of the mini
+	HC	- Whether or not the player is in hardcore
+	
+Output:
+	Returns the score of the given mini
+**************************************************************************************************/
 float getMiniScore(int id, boolean HC) {	
 	string booth = visit_url("peevpee.php?place=rules");
 	int i = 0; // counter
 	miniInfo[int] miniData;
-	
 	file_to_map("pvp_miniData_" + getSeasonNumber() + ".txt", miniData);
 	
 	// There really isn't a great way to make regex readable
@@ -244,6 +263,18 @@ float getMiniScore(int id, boolean HC) {
 	return -999;
 }
 
+/**************************************************************************************************
+Function: miniToInt
+
+Description:
+	Returns the corresponding mini ID of a given mini title
+	
+Input:
+	name	- Name of the mini
+	
+Output:
+	Returns the corresponding mini ID of a given mini title
+**************************************************************************************************/
 int miniToInt(string name) {
 	miniInfo[int] miniData;
 	
@@ -256,6 +287,55 @@ int miniToInt(string name) {
 	}
 	
 	return -1;
+}
+
+boolean playerLookup(string player) {
+	fite[int] fiteData;
+	lookupInfo[string] playerInfo;
+	miniInfo[int] miniData;
+
+	file_to_map("pvp_miniData_" + getSeasonNumber() + ".txt", miniData);
+	file_to_map("pvp_" + my_name() + "_fiteData_" + getSeasonNumber() + ".txt", fiteData);
+	
+	print("I am thinking...");
+	foreach num, fite in fiteData {
+		if(to_lower_case(fite.opponent) == to_lower_case(player)) {
+			print("DING!");
+			foreach mini, results in fite.minis {
+				if(playerInfo[mini].latest < num) {
+					print(mini + " - " + results.score);
+					playerInfo[mini].latest = num;
+					playerInfo[mini].win = results.win;
+					playerInfo[mini].score = results.score;
+					playerInfo[mini].greater = results.win != miniData[miniToInt(mini)].greater;
+				}
+			}
+		}
+	}
+	
+	print("Results for " + player + ":", "green");
+	foreach mini, info in playerInfo {
+		string strbuff = mini + ": ";
+		string color = "blue";
+		
+		if(info.win) {
+			strbuff += "WIN! - ";
+		} else {
+			strbuff += "LOSE! - ";
+			color = "red";
+		}
+		
+		if(info.greater) {
+			strbuff += ">";
+		} else {
+			strbuff += "<";
+		}
+		
+		strbuff += info.score + " (Based off of fight #" + info.latest + ")";
+		print(strbuff, color);
+	}
+	
+	return true;
 }
 
 /**************************************************************************************************
@@ -464,7 +544,7 @@ int maxBuffs(string toMax, int maxPrice, int PPF, int fites, int eatLimit, int d
 		}
 		
 		if(rec.item != $item[none] && rec.item != $item[d20] && contains_text(rec.display, "use") 
-			&& is_tradeable(rec.item)) {
+			&& is_tradeable(rec.item) && rec.score > 0) {
 			
 			float itemDuration = numeric_modifier(rec.item, "Effect Duration");
 			int itemAmount = ceil((fites - have_effect(rec.effect)) / itemDuration);
@@ -750,7 +830,7 @@ boolean autoPvP(int fites, string type, string stance, string who) {
 		
 		while(find(minimatcher)) {
 			string miniName = group(minimatcher, 1);
-			scores[miniName]getMiniScore(miniToInt(miniName), in_hardcore());
+			scores[miniName] = getMiniScore(miniToInt(miniName), in_hardcore());
 		}
 		
 		foreach mini, num in scores {
@@ -759,7 +839,6 @@ boolean autoPvP(int fites, string type, string stance, string who) {
 			print("passing score: " + num);
 			fiteData[getLatestFite()].minis[mini].score = num;
 		}
-
 	} else {
 		while(pvp_attacks_left() > currentFites - fites) {
 			string url = "peevpee.php?action=fight&place=fight&pwd&ranked=" + ranked +
@@ -813,7 +892,10 @@ void main(string params) {
 		string who = "";
 	
 		if(arglen > 3) {
-			who = args[3];
+			for i from 3 to arglen - 1 {
+				print(i);
+				who += args[i] + " ";
+			}
 		}
 		//autoPvP(int fites, string type, string stance, string who)
 		autoPvP(to_int(doWhat), args[1], args[2], who);
