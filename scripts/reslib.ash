@@ -32,9 +32,9 @@ foreach i, num in MONTHLENSTR {
 }
 
 // constants for comparing dates
-int EARLIER = 1;
+int EARLIER = -1;
 int EQUAL = 0;
-int LATER = -1;
+int LATER = 1;
 
 //---------------------------------------------------------
 // Date Functions

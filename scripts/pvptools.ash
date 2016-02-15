@@ -303,7 +303,8 @@ boolean playerLookup(string player) {
 			print("DING!");
 			foreach mini, results in fite.minis {
 				if(playerInfo[mini].latest < num) {
-					print(mini + " - " + results.score);
+					boolean test = results.win != miniData[miniToInt(mini)].greater;
+					print(mini + " - " + results.score + " - " + test);
 					playerInfo[mini].latest = num;
 					playerInfo[mini].win = results.win;
 					playerInfo[mini].score = results.score;
@@ -473,7 +474,7 @@ Input:
 Output:
 	Returns true if successful
 **************************************************************************************************/
-boolean parseConsumptionLogs() {
+boolean parseConsumptionLogs(int daysAgo) {
 	boolean[item] yummyData;
 	string yummyFile = "pvp_" + my_name() + "_yummyData_" + getSeasonNumber() + ".txt";
 	if(!file_to_map(yummyFile, yummyData)) {
@@ -490,11 +491,16 @@ boolean parseConsumptionLogs() {
 	
 		string dateString = group(datematcher, 1);
 		date yummyDate = stringToDate(dateString);
-		
+		date dateAgo = subtractDate(stringToDate(format_date_time("yyyyMMdd", 
+			today_to_string(), "yyyy-MM-dd")), daysAgo);
 		item consumable = group(consumablematcher, 1).to_item();
 		
-		if(compareDate(yummyDate, getSeasonStart()) >= 0) {
+		if(compareDate(yummyDate, getSeasonStart()) >= 0 && 
+				compareDate(yummyDate, dateAgo) >= 0) {
 			print(" DING! " + dateString + " : " + dateToString(getSeasonStart()), "blue");
+			yummyData[consumable] = true;
+		} else {
+			yummyData[consumable] = false;
 		}
 	}
 	
@@ -502,8 +508,14 @@ boolean parseConsumptionLogs() {
 		return false;
 	}
 	
+	set_property("pvp_last_consume_update", today_to_string());
+	
 	return true;
 } 
+
+boolean parseConsumptionLogs() {
+	return parseConsumptionLogs(99);
+}
 
 //---------------------------------------------------------
 // Mini Helping Functions
@@ -709,9 +721,10 @@ boolean uniquelyConsume(string type, int maxPrice, int maxSize, int maxFill, flo
 		}
 		
 		if(is_tradeable(yummy) && item_type(yummy) == type && yummy != $item[none] && 
-			mall_price(yummy) <= maxPrice && mall_price(yummy) != -1 && !consumed[yummy] && 
-			fillSize <= maxSize && averange(yummy.adventures) / fillSize >= minAdv) {
-			
+				!consumed[yummy] && fillSize <= maxSize && fillSize > 0 && 
+				averange(yummy.adventures) / fillSize >= minAdv && mall_price(yummy) <= maxPrice 
+				&& mall_price(yummy) > 0) {
+			//cli_execute("use magicberry");
 			print("Found! " + yummy.to_string(), "blue");
 			buy(1, yummy);
 			
@@ -815,7 +828,7 @@ boolean autoPvP(int fites, string type, string stance, string who) {
 	
 	if(who == "tough") ranked = 2;
 	
-	if(who != "" && who != "tough") {
+	if(who != "" && who != "tough2") {
 		if(typeStr == "fame") {
 			print("You can't attack a specific player for fame.", "red");
 			return false;
@@ -893,8 +906,10 @@ void main(string params) {
 	
 		if(arglen > 3) {
 			for i from 3 to arglen - 1 {
-				print(i);
-				who += args[i] + " ";
+				who += args[i];
+				if(i < arglen - 1) {
+					who += " ";
+				}
 			}
 		}
 		//autoPvP(int fites, string type, string stance, string who)
@@ -902,8 +917,14 @@ void main(string params) {
 	} else {
 		switch(doWhat) {
 			case 'unique':
-				parseConsumptionLogs();
-				uniquelyConsume("booze", 5000, 1, 20, 3, true, false);
+				if(get_property("pvp_last_consume_update") != today_to_string()) {
+					if(arglen > 1) {
+						parseConsumptionLogs(to_int(args[1]));
+					} else {
+						parseConsumptionLogs();
+					}
+				}
+				uniquelyConsume("booze", 5000, 1, 14, 1, true, false);
 				break;
 			case 'logs':
 				int fites;
@@ -917,7 +938,12 @@ void main(string params) {
 				break;
 			case 'eatlogs':
 				print("Yummy logs!", "green");
-				parseConsumptionLogs();
+				if(arglen > 1) {
+					print(to_int(args[1]), "blue");
+					parseConsumptionLogs(to_int(args[1]));
+				} else {
+					parseConsumptionLogs();
+				}
 				break;
 			case 'buff':
 				maxBuffs("item", 5000, 100, pvp_attacks_left(), 0, 0, 0, 999, 999999999, false);
@@ -925,6 +951,17 @@ void main(string params) {
 			case 'capbuff':
 				maxBuffs("item", 5000, 100, 1, 0, 0, 0, 999, 999999999, false);
 				break;	
+			case 'lookup':
+				string who = "";
+				
+				for i from 1 to arglen - 1 {
+					who += args[i];
+					if(i < arglen - 1) {
+						who += " ";
+					}
+				}
+				playerLookup(who);
+				break;
 			default:
 				print("Invalid command!", "blue");
 				break;
